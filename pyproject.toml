@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claude-agent-toolkit"
+version = "0.1.0"
+description = "A production-grade multi-tool AI agent built on the Claude API — tool use, structured outputs, and a hardened tool framework, exposed via CLI and REST API."
+requires-python = ">=3.10"
+readme = "README.md"
+
+[project.scripts]
+agent-toolkit = "agent_toolkit.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
