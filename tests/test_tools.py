@@ -4,6 +4,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
+from agent_toolkit.tools import default_registry
 from agent_toolkit.tools.base import ToolError
 from agent_toolkit.tools.calculator import CalculatorArgs, CalculatorTool
 from agent_toolkit.tools.knowledge_base import KnowledgeBaseTool
@@ -108,3 +109,16 @@ class TestWeatherTool:
             tool = WeatherTool()
             with pytest.raises(ToolError):
                 tool({"location": "Somewhere"})
+
+
+class TestDefaultRegistry:
+    def test_default_registry_has_all_three_tools(self):
+        registry = default_registry()
+        names = {t.name for t in registry}
+        assert names == {"calculator", "knowledge_base_search", "get_weather"}
+
+    def test_no_duplicate_tool_names(self):
+        registry = default_registry()
+        schemas = registry.anthropic_schemas()
+        names = [s["name"] for s in schemas]
+        assert len(names) == len(set(names))
