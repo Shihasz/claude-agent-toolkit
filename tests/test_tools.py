@@ -1,7 +1,9 @@
 import pytest
+from pydantic import ValidationError
 
-from agent_toolkit.tools.calculator import CalculatorArgs, CalculatorTool
 from agent_toolkit.tools.base import ToolError
+from agent_toolkit.tools.calculator import CalculatorArgs, CalculatorTool
+from agent_toolkit.tools.knowledge_base import KnowledgeBaseTool
 
 
 class TestCalculatorTool:
@@ -32,5 +34,23 @@ class TestCalculatorTool:
         assert "expression" in schema["input_schema"]["properties"]
 
     def test_args_model_validates_types(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             CalculatorArgs.model_validate({"expression": [1, 2, 3]})
+
+
+class TestKnowledgeBaseTool:
+    def test_finds_relevant_doc(self):
+        tool = KnowledgeBaseTool()
+        result = tool({"query": "idempotent retryable operation"})
+        assert result["results"]
+        assert any("idempotency" in r["id"] for r in result["results"])
+
+    def test_no_match_returns_empty_results(self):
+        tool = KnowledgeBaseTool()
+        result = tool({"query": "xyzzy nonsense query zzz"})
+        assert result["results"] == []
+
+    def test_top_k_is_respected(self):
+        tool = KnowledgeBaseTool()
+        result = tool({"query": "the a is", "top_k": 1})
+        assert len(result["results"]) <= 1
