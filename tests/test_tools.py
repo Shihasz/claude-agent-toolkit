@@ -1,9 +1,13 @@
+from unittest.mock import MagicMock, patch
+
+import httpx
 import pytest
 from pydantic import ValidationError
 
 from agent_toolkit.tools.base import ToolError
 from agent_toolkit.tools.calculator import CalculatorArgs, CalculatorTool
 from agent_toolkit.tools.knowledge_base import KnowledgeBaseTool
+from agent_toolkit.tools.weather import WeatherTool
 
 
 class TestCalculatorTool:
@@ -54,3 +58,53 @@ class TestKnowledgeBaseTool:
         tool = KnowledgeBaseTool()
         result = tool({"query": "the a is", "top_k": 1})
         assert len(result["results"]) <= 1
+
+
+class TestWeatherTool:
+    def test_parses_successful_response(self):
+        fake_json = {
+            "current_condition": [
+                {
+                    "temp_C": "27",
+                    "FeelsLikeC": "29",
+                    "weatherDesc": [{"value": "Partly cloudy"}],
+                    "humidity": "80",
+                }
+            ]
+        }
+        fake_response = MagicMock()
+        fake_response.json.return_value = fake_json
+        fake_response.raise_for_status.return_value = None
+
+        with patch("httpx.get", return_value=fake_response):
+            tool = WeatherTool()
+            result = tool({"location": "Kochi"})
+
+        assert result["location"] == "Kochi"
+        assert result["temp_c"] == "27"
+        assert result["description"] == "Partly cloudy"
+
+    def test_timeout_raises_tool_error(self):
+        with patch("httpx.get", side_effect=httpx.TimeoutException("timed out")):
+            tool = WeatherTool()
+            with pytest.raises(ToolError):
+                tool({"location": "Nowhere"})
+
+    def test_bad_status_raises_tool_error(self):
+        fake_response = MagicMock()
+        fake_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "err", request=MagicMock(), response=MagicMock(status_code=503)
+        )
+        with patch("httpx.get", return_value=fake_response):
+            tool = WeatherTool()
+            with pytest.raises(ToolError):
+                tool({"location": "Somewhere"})
+
+    def test_unexpected_payload_raises_tool_error(self):
+        fake_response = MagicMock()
+        fake_response.raise_for_status.return_value = None
+        fake_response.json.return_value = {"unexpected": "shape"}
+        with patch("httpx.get", return_value=fake_response):
+            tool = WeatherTool()
+            with pytest.raises(ToolError):
+                tool({"location": "Somewhere"})
